@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pizza Ordering</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍕</text></svg>">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/vendor/mustache.min.js" defer></script>
+    <script src="js/config.js" defer></script>
+    <script src="js/api.js" defer></script>
+    <script src="js/app.js" defer></script>
+</head>
+<body>
+<nav class="navbar navbar-expand navbar-dark bg-dark">
+    <a class="navbar-brand" href="#home">🍕 Pizza Ordering</a>
+    <ul class="navbar-nav mr-auto">
+        <li class="nav-item"><a class="nav-link" href="#home">Menu</a></li>
+        <li class="nav-item auth-only"><a class="nav-link" href="#new-order">New order</a></li>
+        <li class="nav-item auth-only"><a class="nav-link" href="#orders">My orders</a></li>
+        <li class="nav-item auth-only"><a class="nav-link" href="#account">My account</a></li>
+    </ul>
+    <ul class="navbar-nav">
+        <li class="nav-item guest-only"><a class="nav-link" href="#login">Log in</a></li>
+        <li class="nav-item guest-only"><a class="nav-link" href="#register">Sign up</a></li>
+        <li class="nav-item auth-only"><span class="navbar-text mr-3">Hi, <strong id="nav-login"></strong></span></li>
+        <li class="nav-item auth-only"><a class="nav-link" href="#" data-action="logout">Log out</a></li>
+    </ul>
+</nav>
+
+<main class="container py-4">
+    <div id="toast" class="alert" role="status" hidden></div>
+    <div id="view"></div>
+</main>
+
+<footer class="container text-muted small pb-4">
+    REST API: <a href="swagger-ui.html">Swagger UI</a>
+</footer>
+
+<!-- ============================== Templates ============================== -->
+
+<script id="tpl-home" type="x-tmpl-mustache">
+    <div class="jumbotron py-4">
+        <h1 class="display-4">Hungry?</h1>
+        <p class="lead mb-0">Pick your favourites, pay online and follow your order until it leaves the oven.
+            <span class="text-muted">({{customerCount}} registered customer(s))</span></p>
+    </div>
+    <h2 class="h4 mb-3">Our menu</h2>
+    <div class="menu-grid">
+        {{#pizzas}}
+        <div class="card pizza-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <h3 class="h6 card-title mb-1">{{name}}</h3>
+                    <span class="badge badge-dark">{{priceLabel}}</span>
+                </div>
+                <span class="badge base-{{base}}">{{base}} base</span>
+                <p class="card-text small text-muted mt-2">{{ingredientList}}</p>
+            </div>
+        </div>
+        {{/pizzas}}
+    </div>
+</script>
+
+<script id="tpl-register" type="x-tmpl-mustache">
+    <div class="form-card">
+        <h2 class="h4 mb-3">Create an account</h2>
+        <form data-form="register">
+            <div class="form-group">
+                <label for="register-login">Login</label>
+                <input class="form-control" id="register-login" name="login" required pattern="[A-Za-z0-9_\-]{3,30}"
+                       title="3 to 30 letters, digits, '_' or '-'">
+            </div>
+            <div class="form-group">
+                <label for="register-name">Display name</label>
+                <input class="form-control" id="register-name" name="name" required maxlength="50">
+            </div>
+            <div class="form-group">
+                <label for="register-password">Password</label>
+                <input class="form-control" id="register-password" name="password" type="password" required minlength="6" autocomplete="new-password">
+            </div>
+            <button class="btn btn-primary" type="submit">Sign up</button>
+        </form>
+    </div>
+</script>
+
+<script id="tpl-login" type="x-tmpl-mustache">
+    <div class="form-card">
+        <h2 class="h4 mb-3">Log in</h2>
+        <form data-form="login">
+            <div class="form-group">
+                <label for="login-login">Login</label>
+                <input class="form-control" id="login-login" name="login" required value="{{login}}">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <input class="form-control" id="login-password" name="password" type="password" required autocomplete="current-password">
+            </div>
+            <button class="btn btn-primary" type="submit">Log in</button>
+            <a class="ml-3" href="#register">No account yet?</a>
+        </form>
+    </div>
+</script>
+
+<script id="tpl-account" type="x-tmpl-mustache">
+    <div class="form-card">
+        <h2 class="h4 mb-3">My account</h2>
+        <p>Login: <strong>{{login}}</strong></p>
+        <p>You have placed <a href="#orders">{{orders.length}} order(s)</a>.</p>
+        <form data-form="rename" class="mb-4">
+            <label for="account-name">Display name</label>
+            <div class="input-group">
+                <input class="form-control" id="account-name" name="name" required maxlength="50" value="{{name}}">
+                <div class="input-group-append">
+                    <button class="btn btn-primary" type="submit">Save</button>
+                </div>
+            </div>
+        </form>
+        <button class="btn btn-outline-danger btn-sm" data-action="delete-account">Delete my account</button>
+    </div>
+</script>
+
+<script id="tpl-orders" type="x-tmpl-mustache">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h4 mb-0">My orders</h2>
+        <a class="btn btn-primary" href="#new-order">New order</a>
+    </div>
+    {{#orders.length}}
+    <table class="table table-hover bg-white">
+        <thead><tr><th>#</th><th>Pizzas</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>
+        {{#orders}}
+        <tr>
+            <td><a href="#order/{{id}}">Order {{id}}</a></td>
+            <td>{{pizzas.length}}</td>
+            <td>{{priceLabel}}</td>
+            <td><span class="badge status-{{status}}">{{statusLabel}}</span></td>
+        </tr>
+        {{/orders}}
+        </tbody>
+    </table>
+    {{/orders.length}}
+    {{^orders.length}}<p class="text-muted">You have not ordered anything yet.</p>{{/orders.length}}
+</script>
+
+<script id="tpl-new-order" type="x-tmpl-mustache">
+    <h2 class="h4 mb-3">New order</h2>
+    <div class="row">
+        <div class="col-md-7">
+            <div class="list-group mb-3">
+                {{#pizzas}}
+                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between"
+                        data-action="basket-add" data-pizza="{{name}}">
+                    <span>{{name}} <small class="text-muted">({{base}})</small></span>
+                    <span>{{priceLabel}} <span class="text-primary ml-2">+ Add</span></span>
+                </button>
+                {{/pizzas}}
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="card sticky-top">
+                <div class="card-body" id="basket"></div>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script id="tpl-basket" type="x-tmpl-mustache">
+    <h3 class="h5">Your basket</h3>
+    {{#items.length}}
+    <ul class="list-unstyled">
+        {{#items}}
+        <li class="d-flex justify-content-between align-items-center mb-1">
+            <span>{{name}}</span>
+            <span>{{priceLabel}}
+                <button class="btn btn-link btn-sm text-danger" data-action="basket-remove" data-index="{{index}}">✕</button>
+            </span>
+        </li>
+        {{/items}}
+    </ul>
+    <p class="font-weight-bold">Total: {{totalLabel}}</p>
+    <button class="btn btn-success btn-block" data-action="basket-submit">Place order</button>
+    {{/items.length}}
+    {{^items.length}}<p class="text-muted mb-0">Click on a pizza to add it.</p>{{/items.length}}
+</script>
+
+<script id="tpl-order" type="x-tmpl-mustache">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h4 mb-0">Order {{id}}</h2>
+        <span class="badge status-{{status}} status-lg">{{statusLabel}}</span>
+    </div>
+    {{#preparing}}
+    <div class="progress mb-3"><div class="progress-bar progress-bar-striped progress-bar-animated w-100">In the oven…</div></div>
+    {{/preparing}}
+    <ul class="list-group mb-3">
+        {{#pizzas}}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>{{name}} <small class="text-muted">({{base}})</small> {{#ready}}✅{{/ready}}</span>
+            <span>{{priceLabel}}
+                {{#editable}}<button class="btn btn-link btn-sm text-danger" data-action="order-remove" data-pizza="{{name}}">Remove</button>{{/editable}}
+            </span>
+        </li>
+        {{/pizzas}}
+        {{^pizzas}}<li class="list-group-item text-muted">This order is empty.</li>{{/pizzas}}
+        <li class="list-group-item d-flex justify-content-between font-weight-bold"><span>Total</span><span>{{priceLabel}}</span></li>
+    </ul>
+    {{#editable}}
+    <form data-form="order-add" class="form-inline mb-4">
+        <select class="form-control mr-2" name="pizzaName">
+            {{#menu}}<option value="{{name}}">{{name}} – {{priceLabel}}</option>{{/menu}}
+        </select>
+        <button class="btn btn-outline-primary" type="submit">Add pizza</button>
+    </form>
+    <button class="btn btn-success" data-action="order-pay">Pay {{priceLabel}}</button>
+    <button class="btn btn-outline-danger ml-2" data-action="order-cancel">Cancel order</button>
+    {{/editable}}
+    <a class="btn btn-link" href="#orders">Back to my orders</a>
+</script>
+
+<script id="tpl-error" type="x-tmpl-mustache">
+    <div class="text-center py-5">
+        <h2 class="h3">{{title}}</h2>
+        <p class="text-muted">{{message}}</p>
+        <a href="#home">Back to the menu</a>
+    </div>
+</script>
+</body>
+</html>

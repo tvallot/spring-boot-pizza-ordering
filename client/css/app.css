@@ -1,0 +1,43 @@
+body {
+    background: #f6f4f1;
+}
+
+.form-card {
+    max-width: 480px;
+    background: #fff;
+    border-radius: .5rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.pizza-card {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+
+.base-tomato { background: #e4572e; color: #fff; }
+.base-cream  { background: #f3e9d2; color: #6b5a3a; }
+
+.status-AWAITING_PAYMENT { background: #ffc107; color: #212529; }
+.status-PREPARING        { background: #17a2b8; color: #fff; }
+.status-READY            { background: #28a745; color: #fff; }
+.status-lg               { font-size: 1rem; padding: .5em .8em; }
+
+#toast {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1050;
+    min-width: 260px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+}
+
+/* Visibility depending on the authentication state (set on <body> by app.js) */
+body:not(.authenticated) .auth-only { display: none !important; }
+body.authenticated .guest-only      { display: none !important; }
